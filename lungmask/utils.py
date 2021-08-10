@@ -10,21 +10,28 @@ import logging
 from tqdm import tqdm
 import fill_voids
 import skimage.morphology
+from abc import ABC, abstractmethod
 
-class Action():
-    #I want to apply Aggregate Pattern into this utils.py, and put all the processing method into a class.
-    #Action Class means that the action for processing picture and it is the boundery that include all the domain pattern about doing action to picture.. 
-    #When mask.py want to call these method, it must go through Action class if Action available
+class Action(ABC):
+    #I want to apply creational design pattern (Factory Pattern) into this utils.py, and put all the processing method into a class.
+    #Action Class means that the action for processing picture. 
+    #When mask.py want to call these methods, it must go through if Action available
     #And this Action Class include the Processing Action(preprocessing, postprocessing, simple_bodymask, crop_and_resize...)
     #it will not influence LungLabelsDS_inf Class
+    #This Action class is a abstract class, so every child class(process action) will overwrite the do_this_action_to_pic
+    #There is a benefit to use factory pattern, if we want to do more action to the picture.
+    #For example, if I want to do more action to the picture, I want to figure out smoke damage to lung, so I can add a new class and override abstract class method do_this_action_to_pic.
+    #example: class get_out_smoke_area(Action): 
+    #               def do_this_action_to_pic(...)
+    #                   ......(code)                            
+    @abstractmethod
+    def do_this_action_to_pic(self):
+        pass
+    
 
-    #Constructor for this Action Class
-    #these attribute might be used in the rest of defiend method.
-    def __init__(self, img, label_image, tbox):
-        self.img = img
-        self.label_image = label_image
-        self.tbox = tbox
-    def preprocess(img, label=None, resolution=[192, 192]):
+class preprocess(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(img, label=None, resolution=[192, 192]):
         imgmtx = np.copy(img)
         lblsmtx = np.copy(label)
 
@@ -35,9 +42,9 @@ class Action():
         cip_mask = []
         for i in range(imgmtx.shape[0]):
             if label is None:
-                (im, m, box) = Action.crop_and_resize(imgmtx[i, :, :], width=resolution[0], height=resolution[1])
+                (im, m, box) = crop_and_resize.do_this_action_to_pic(imgmtx[i, :, :], width=resolution[0], height=resolution[1])
             else:
-                (im, m, box) = Action.crop_and_resize(imgmtx[i, :, :], mask=lblsmtx[i, :, :], width=resolution[0],
+                (im, m, box) = crop_and_resize.do_this_action_to_pic(imgmtx[i, :, :], mask=lblsmtx[i, :, :], width=resolution[0],
                                             height=resolution[1])
                 cip_mask.append(m)
             cip_xnew.append(im)
@@ -47,8 +54,9 @@ class Action():
         else:
             return np.asarray(cip_xnew), cip_box, np.asarray(cip_mask)
 
-
-    def simple_bodymask(img):
+class simple_bodymask(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(img):
         maskthreshold = -500
         oshape = img.shape
         img = ndimage.zoom(img, 128/np.asarray(img.shape), order=0)
@@ -65,9 +73,10 @@ class Action():
         real_scaling = np.asarray(oshape)/128
         return ndimage.zoom(bodymask, real_scaling, order=0)
 
-
-    def crop_and_resize(img, mask=None, width=192, height=192):
-        bmask = Action.simple_bodymask(img)
+class crop_and_resize(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(img, mask=None, width=192, height=192):
+        bmask = simple_bodymask.do_this_action_to_pic(img)
         # img[bmask==0] = -1024 # this line removes background outside of the lung.
         # However, it has been shown problematic with narrow circular field of views that touch the lung.
         # Possibly doing more harm than help
@@ -93,16 +102,18 @@ class Action():
     #     res[tbox[0]:tbox[2], tbox[1]:tbox[3]] = imgres
     #     return res
 
-
-    def reshape_mask(mask, tbox, origsize):
+class reshape_mask(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(mask, tbox, origsize):
         res = np.ones(origsize) * 0
         resize = [tbox[2] - tbox[0], tbox[3] - tbox[1]]
         imgres = ndimage.zoom(mask, resize / np.asarray(mask.shape), order=0)
         res[tbox[0]:tbox[2], tbox[1]:tbox[3]] = imgres
         return res
 
-
-    def read_dicoms(path, primary=True, original=True):
+class read_dicoms(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(path, primary=True, original=True):
         allfnames = []
         for dir, _, fnames in os.walk(path):
             [allfnames.append(os.path.join(dir, fname)) for fname in fnames]
@@ -129,8 +140,8 @@ class Action():
                             else:
                                 is_original = True
 
-                            # if 'ConvolutionKernel' in dicom_header:
                             #     ck = dicom_header.ConvolutionKernel
+                            # if 'ConvolutionKernel' in dicom_header:
                             # else:
                             #     ck = 'unknown'
                             if is_primary and is_original and 'LOCALIZER' not in dicom_header.ImageType:
@@ -176,14 +187,15 @@ class Action():
 
         return relevant_volumes
 
-
-    def get_input_image(path):
+class get_input_image(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(path):
         if os.path.isfile(path):
             logging.info(f'Read input: {path}')
             input_image = sitk.ReadImage(path)
         else:
             logging.info(f'Looking for dicoms in {path}')
-            dicom_vols = Action.read_dicoms(path, original=False, primary=False)
+            dicom_vols = read_dicoms.do_this_action_to_pic(path, original=False, primary=False)
             if len(dicom_vols) < 1:
                 sys.exit('No dicoms found!')
             if len(dicom_vols) > 1:
@@ -192,7 +204,9 @@ class Action():
         return input_image
 
 
-    def postrocessing(label_image, spare=[]):
+class postrocessing(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(label_image, spare=[]):
         '''some post-processing mapping small label patches to the neighbout whith which they share the
             largest border. All connected components smaller than min_area will be removed
         '''
@@ -214,7 +228,7 @@ class Action():
 
         for r in tqdm(regions):
             if (r.area < origlabels_maxsub[r.max_intensity] or r.max_intensity in spare) and r.area>2: # area>2 improves runtime because small areas 1 and 2 voxel will be ignored
-                bb = Action.bbox_3D(regionmask == r.label)
+                bb = bbox_3D.do_this_action_to_pic(regionmask == r.label)
                 sub = regionmask[bb[0]:bb[1], bb[2]:bb[3], bb[4]:bb[5]]
                 dil = ndimage.binary_dilation(sub == r.label)
                 neighbours, counts = np.unique(sub[dil], return_counts=True)
@@ -244,12 +258,14 @@ class Action():
 
         outmask = np.zeros(outmask_mapped.shape, dtype=np.uint8)
         for i in np.unique(outmask_mapped)[1:]:
-            outmask[holefiller(Action.keep_largest_connected_component(outmask_mapped == i))] = i
+            outmask[holefiller(keep_largest_connected_component.do_this_action_to_pic(outmask_mapped == i))] = i
 
         return outmask
 
 
-    def bbox_3D(labelmap, margin=2):
+class bbox_3D(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(labelmap, margin=2):
         shape = labelmap.shape
         r = np.any(labelmap, axis=(1, 2))
         c = np.any(labelmap, axis=(0, 2))
@@ -270,8 +286,9 @@ class Action():
 
         return np.asarray([rmin, rmax, cmin, cmax, zmin, zmax])
 
-
-    def keep_largest_connected_component(mask):
+class keep_largest_connected_component(Action):
+    # overriding abstract method: do_this_action_to_pic
+    def do_this_action_to_pic(mask):
         mask = skimage.measure.label(mask)
         regions = skimage.measure.regionprops(mask)
         resizes = np.asarray([x.area for x in regions])
@@ -281,10 +298,10 @@ class Action():
 
 class LungLabelsDS_inf(Dataset):
     def __init__(self, ds):
-            self.dataset = ds
+        self.dataset = ds
 
     def __len__(self):
-            return len(self.dataset)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-            return self.dataset[idx, None, :, :].astype(np.float)
+        return self.dataset[idx, None, :, :].astype(np.float)
