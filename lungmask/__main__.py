@@ -39,7 +39,7 @@ def main():
 
     logging.info(f'Load model')
     
-    input_image = utils.get_input_image(args.input)
+    input_image = utils.get_input_image.do_this_action_to_pic(args.input)
     logging.info(f'Infer lungmask')
     if args.modelname == 'LTRCLobes_R231':
         result = mask.apply_fused(input_image, force_cpu=args.cpu, batch_size=batchsize, volume_postprocessing=not(args.nopostprocess), noHU=args.noHU)

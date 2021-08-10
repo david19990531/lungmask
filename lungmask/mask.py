@@ -47,7 +47,7 @@ def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessi
 
     
     if not noHU:
-        tvolslices, xnew_box = utils.preprocess(inimg_raw, resolution=[256, 256])
+        tvolslices, xnew_box = utils.preprocess.do_this_action_to_pic(inimg_raw, resolution=[256, 256])
         tvolslices[tvolslices > 600] = 600
         tvolslices = np.divide((tvolslices + 1024), 1624)
     else:
@@ -74,7 +74,7 @@ def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessi
     # postprocessing includes removal of small connected components, hole filling and mapping of small components to
     # neighbors
     if volume_postprocessing:
-        outmask = utils.postrocessing(timage_res)
+        outmask = utils.postrocessing.do_this_action_to_pic(timage_res)
     else:
         outmask = timage_res
 
@@ -82,7 +82,7 @@ def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessi
         outmask = skimage.transform.resize(outmask[np.argmax((outmask==1).sum(axis=(1,2)))], inimg_raw.shape[:2], order=0, anti_aliasing=False, preserve_range=True)[None,:,:]
     else:
          outmask = np.asarray(
-            [utils.reshape_mask(outmask[i], xnew_box[i], inimg_raw.shape[1:]) for i in range(outmask.shape[0])],
+            [utils.reshape_mask.do_this_action_to_pic(outmask[i], xnew_box[i], inimg_raw.shape[1:]) for i in range(outmask.shape[0])],
             dtype=np.uint8)
     
     if not numpy_mode:
@@ -118,4 +118,4 @@ def apply_fused(image, basemodel = 'LTRCLobes', fillmodel = 'R231', force_cpu=Fa
     res_l[np.logical_and(res_l==0, res_r>0)] = spare_value
     res_l[res_r==0] = 0
     logging.info("Fusing results... this may take up to several minutes!")
-    return utils.postrocessing(res_l, spare=[spare_value])
+    return utils.do_this_action_to_pic(res_l, spare=[spare_value])
