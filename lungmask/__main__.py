@@ -39,13 +39,15 @@ def main():
 
     logging.info(f'Load model')
     
-    input_image = utils.get_input_image.do_this_action_to_pic(args.input)
+    input_image = utils.get_input_image(args.input)
     logging.info(f'Infer lungmask')
     if args.modelname == 'LTRCLobes_R231':
-        result = mask.apply_fused(input_image, force_cpu=args.cpu, batch_size=batchsize, volume_postprocessing=not(args.nopostprocess), noHU=args.noHU)
+        #When we want to use Apply_Fused class's method "choose_apply_way", we should construct a new object model and then call the methods.
+        model = mask.Models.get_model(args.modeltype, 'LTRCLobes_R231')
+        result = mask.Apply_Fused(model).choose_apply_way(input_image, force_cpu=args.cpu, batch_size=batchsize, volume_postprocessing=not(args.nopostprocess), noHU=args.noHU)
     else:
-        model = mask.get_model(args.modeltype, args.modelname)
-        result = mask.apply(input_image, model, force_cpu=args.cpu, batch_size=batchsize, volume_postprocessing=not(args.nopostprocess), noHU=args.noHU)
+        model = mask.Models.get_model(args.modeltype, args.modelname)
+        result = mask.Apply(model).choose_apply_way(input_image, model, force_cpu=args.cpu, batch_size=batchsize, volume_postprocessing=not(args.nopostprocess), noHU=args.noHU)
         
     if args.noHU:
         file_ending = args.output.split('.')[-1]
