@@ -17,28 +17,25 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 # I will apply Structural Design pattern (bridge pattern) into this project5.
 # I believe bridge pattern could make mask.py file and project better
-# Comparing to the original code, I add two abstract class "Models" & "Applying_Model"
+# Comparing to the original code, I add a abstract class "Models" & Interface "Applying_ModelInterface"
 # For the abstract class "Models", it means it will get different type of models, such as "R231, LTRCLobe, R231CovidWeb..."
 # In the future, it might be have more other accident disease, then we could easily add one models and inherited Models class's method "get_model"
-# For the abstract class "Applying_Models", it  will have one abstract method called "choose_apply_way"
-# Then there are two different applying model's way class "Apply" & "Apply_Fused" inherited abstract class "Applying_Models"
-# These classes will override abstract method "chhose_apply_way". 
-# Because this is the bridge pattern, when we “_init_”(Constructor), abstract class "Models" associated to abstract class "Applying_Models"
+# For the Interface class "Applying_Models", it  will have a method called "choose_apply_way"
+# Then there are two different applying model's way class "Apply" & "Apply_Fused" inherited Interface class "Applying_Models"
+# These classes will override method "chhose_apply_way". 
+# Because this is the bridge pattern, when we “_init_”(Constructor), abstract class "Models" associated to Interface class "Applying_Models"
 # Using bridge pattern will make the code and structure more clear and have a realationship.
 # We could easily add more different type of models or different type of Applying way in the future 
 # For example, in the future, we could add a smoking model about lungmask and a new specific smoking applying way in the project.
-
-
 class Models(metaclass=ABCMeta):
-    def __init__(self, applying_model):
-        self._applying_model = applying_model
+    def __init__(self, Applying_ModelInterface):
+        self._applying_model = Applying_ModelInterface
 
     model_urls = {('unet', 'R231'): ('https://github.com/JoHof/lungmask/releases/download/v0.0/unet_r231-d5d2fc3d.pth', 3),
               ('unet', 'LTRCLobes'): (
                   'https://github.com/JoHof/lungmask/releases/download/v0.0/unet_ltrclobes-3a07043d.pth', 6),
               ('unet', 'R231CovidWeb'): (
-                  'https://github.com/JoHof/lungmask/releases/download/v0.0/unet_r231covid-0de78a7e.pth', 3)}
-    
+                  'https://github.com/JoHof/lungmask/releases/download/v0.0/unet_r231covid-0de78a7e.pth', 3)}  
     def get_model(modeltype, modelname):
         model_url, n_classes = Models.model_urls[(modeltype, modelname)]
         state_dict = torch.hub.load_state_dict_from_url(model_url, progress=True, map_location=torch.device('cpu'))
@@ -50,9 +47,7 @@ class Models(metaclass=ABCMeta):
             logging.exception(f"Model {modelname} not known")
         model.load_state_dict(state_dict)
         model.eval()
-        return model
-
-        
+        return model      
 class R231Model(Models):
     def get_model(modeltype):
         super().get_model()
@@ -65,17 +60,16 @@ class R231CovidWebModel(Models):
     def get_model(modeltype):
         super().get_model()
 
-class LTRCLobes_R231Model(models):
+class LTRCLobes_R231Model(Models):
     def get_model(modeltype):
         super().get_model()
 
 
-class Applying_Model(Models):
-    @abstractmethod
+class Applying_ModelInterface:
     def choose_apply_way(self):
         pass
 
-class Apply(Applying_Model):
+class Apply(Applying_ModelInterface):
     # overriding abstract method
     def choose_apply_way(image, model=None, force_cpu=False, batch_size=20, volume_postprocessing=True, noHU=False):
         if model is None:
@@ -150,7 +144,7 @@ class Apply(Applying_Model):
         return outmask.astype(np.uint8)
 
 
-class Apply_Fused(Applying_Model):
+class Apply_Fused(Applying_ModelInterface):
     # overriding abstract method
     def choose_apply_way(image, basemodel = 'LTRCLobes', fillmodel = 'R231', force_cpu=False, batch_size=20, volume_postprocessing=True, noHU=False):
         '''Will apply basemodel and use fillmodel to mitiage false negatives'''
